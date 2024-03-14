@@ -11,15 +11,16 @@ func main() {
 	done := make(chan interface{})
 	defer close(done)
 
-	for nb := range repeatFunc(done, randomNumberGenerator) {
-		fmt.Printf("receiving %v from stream\n", nb)
+	for nb := range take(done, repeatFunc(done, randomNumberGenerator), 5) {
+		fmt.Printf("receiving %d from stream\n", nb)
 	}
 
 	fmt.Println(time.Since(start))
 }
 
 func randomNumberGenerator() int {
-	return rand.Intn(1000000000)
+	r := rand.Intn(1000000000)
+	return r
 }
 func repeatFunc[T any, D any](done <-chan D, fn func() T) <-chan T {
 	stream := make(chan T)
@@ -28,14 +29,31 @@ func repeatFunc[T any, D any](done <-chan D, fn func() T) <-chan T {
 		defer close(stream)
 
 		for {
+			r := fn()
 			select {
 			case <-done:
 				return
-			case stream <- fn():
-				fmt.Printf("sending %v in stream\n", fn())
+			case stream <- r:
+				fmt.Printf("sending %v in stream\n", r)
 			}
 		}
 	}()
 
 	return stream
+}
+
+func take[T any, D any](done <-chan D, inputStream <-chan T, n int) <-chan T {
+	outputStream := make(chan T)
+	go func() {
+		defer close(outputStream)
+		for i := 0; i < n; i++ {
+			select {
+			case <-done:
+				return
+			case outputStream <- <-inputStream:
+			}
+		}
+	}()
+
+	return outputStream
 }
