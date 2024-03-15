@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"runtime"
+	"sync"
 	"time"
 )
 
@@ -13,12 +15,49 @@ func main() {
 	defer close(done)
 
 	randomNumberSteam := repeatFunc(done, randomNumberGenerator)
-	primeStream := primeCatcher(done, randomNumberSteam)
+
+	// fan-out
+	cpuCount := runtime.NumCPU()
+	primeCatcherChans := make([]<-chan int, cpuCount)
+	for i := 0; i < cpuCount; i++ {
+		primeCatcherChans[i] = primeCatcher(done, randomNumberSteam)
+	}
+
+	// fan-in
+	primeStream := fanInPrimes(done, primeCatcherChans...)
 	for nb := range take(done, primeStream, 10) {
-		fmt.Printf("receiving prime number %d from stream\n", nb)
+		fmt.Printf("receiving prime number %d from fanned-in stream\n", nb)
 	}
 
 	fmt.Println(time.Since(start))
+}
+func fanInPrimes[T any, D any](done <-chan D, catchers ...<-chan T) <-chan T {
+	mergeStream := make(chan T)
+	var wg sync.WaitGroup
+
+	transfer := func(c <-chan T) {
+		defer wg.Done()
+		for i := range c {
+			select {
+			case <-done:
+				return
+			case mergeStream <- i:
+			}
+		}
+
+	}
+
+	for _, c := range catchers {
+		wg.Add(1)
+		go transfer(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(mergeStream)
+	}()
+
+	return mergeStream
 }
 
 func randomNumberGenerator() int {
