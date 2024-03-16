@@ -15,36 +15,12 @@ func main() {
 		close(done)
 	}()
 
-	stars := make(chan interface{}, 100)
-	lines := make(chan interface{}, 100)
-	go func() {
-		defer close(stars)
-		for {
-			select {
-			case <-done:
-				return
-			case stars <- "******":
-			}
-		}
-	}()
-
-	go func() {
-		defer close(lines)
-		for {
-			select {
-			case <-done:
-				return
-			case lines <- "------":
-			}
-		}
-	}()
-
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go seeStars(done, &wg, stars)
+	go seeStars(done, &wg, generate(done, "*"))
 
 	wg.Add(1)
-	go seeLines(done, &wg, lines)
+	go seeLines(done, &wg, generate(done, "-"))
 
 	wg.Wait()
 
@@ -53,9 +29,9 @@ func main() {
 
 func generate(done <-chan interface{}, e interface{}) <-chan interface{} {
 	stream := make(chan interface{}, 100)
-	defer close(stream)
 
 	go func() {
+		defer close(stream)
 		for {
 			select {
 			case <-done:
