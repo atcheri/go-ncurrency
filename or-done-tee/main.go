@@ -56,7 +56,7 @@ func transactionGenerator(done <-chan struct{}) <-chan int {
 	go func() {
 		defer close(out)
 
-		for i := 0; i < 200; i++ {
+		for range 200 {
 			select {
 			case <-done:
 				fmt.Println("Transaction Generator: Shutting down.")
@@ -92,7 +92,7 @@ func analyticsPipeline(done <-chan struct{}, input <-chan int) {
 		count++
 	}
 	if count > 0 {
-		fmt.Printf("Analytics Pipeline: Average transaction amount: %§d\n", total/count)
+		fmt.Printf("Analytics Pipeline: Average transaction amount: %d\n", total/count)
 	}
 
 	fmt.Println("Analytics Pipeline shutting down.")
